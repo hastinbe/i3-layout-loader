@@ -1,0 +1,144 @@
+#!/bin/bash
+#
+#  i3-layout-loader
+#
+#  Loads i3wm workspace layouts.
+#
+#  Requires:
+#   i3 v4.8+
+#
+#  Copyright (c) 2017 Beau Hastings. All rights reserved.
+#  License: GNU General Public License v2
+#
+#  Author: Beau Hastings <beausy@gmail.com>
+#  URL: https://github.com/hastinbe/i3-layout-loader
+#
+#  Usage:
+#    From your i3 configuration file, you can autostart i3-layout-loader
+#    like this:
+#        exec --no-startup-id ~/i3-layout-loader/loader
+#
+#  Layouts:
+#    Files in your layouts directory should be named according to their
+#    workspace name. ex: workspace "1" should be named "1.json" or just "1"
+#
+#    Output the layout for a workspace:
+#        i3-save-tree --workspace=1 > 1.json
+#        i3-save-tree --workspace=name > name.json
+#
+#  Hooks:
+#    Are stored in the `hooks` subdirectory of this script. To enable a hook,
+#    put a file in the `hooks` subdirectory that is named appropriately and is
+#    executable.
+#
+#    Available hooks:
+#       pre-layout-load -- Called before loading layouts
+#      post-layout-load -- Called after loading layouts
+#
+#      post-layout-load is perfect for defining programs to execute after
+#      your layouts have been loaded. If you specified swallow criteria for
+#      these programs in your layouts they will be placed into their
+#      designated placeholder container within the workspace.
+
+HOOK_PATH="${BASH_SOURCE%/*}/hooks"
+
+# Display an error and exit.
+#
+# Arguments:
+#   message  (string) The error message to output.
+die() {
+    echo "$0: $@" 1>&2
+    exit 1
+}
+
+# Display program usage.
+usage() {
+    echo "Usage: $0 [options]
+Load i3wm workspace layouts.
+
+Options:
+  -d <directory>    use the provided layout directory
+  -h                display this help and exit
+" 1>&2
+    exit 0
+}
+
+# Parse script options.
+parse_options() {
+    local OPTIND o
+
+    while getopts ":d:h" o; do
+        case "${o}" in
+            d)
+                set_layout_path "${OPTARG}" ;;
+            h | *)
+                usage ;;
+        esac
+    done
+
+    shift $((OPTIND-1)) # Shift off options and optional --
+}
+
+# Set i3 layout path.
+#
+# Tries to discover the layout path if no argument is provided.
+#
+# Arguments:
+#   path  (string) (optional) Path to layout directory.
+set_layout_path() {
+    if [ -n "$1" ] && [ -d "$1" ]; then
+        layout_path="$1"
+    elif [ -d "${BASH_SOURCE%/*}" ]; then
+        layout_path="${BASH_SOURCE%/*}/layouts"
+    elif [ -d ~/.config/i3 ]; then
+        layout_path=~/.config/i3/layouts
+    elif [ -d "$XDG_CONFIG_HOME/i3" ]; then
+        layout_path="$XDG_CONFIG_HOME/i3/layouts"
+    elif [ -d "$XDG_CONFIG_DIRS/i3" ]; then
+        layout_path="$XDG_CONFIG_DIRS/i3/layouts"
+    else
+        die "Could not find a layout path. Try specifying one with the -d flag"
+    fi
+}
+
+# Run a hook.
+#
+# Arguments:
+#   hook  (string) Name of the hook.
+run_hook() {
+    local name=$1
+
+    if [ -x "${HOOK_PATH}/${hook}" ]; then
+        source "${HOOK_PATH}/hook"
+    fi
+}
+
+# Main program.
+main() {
+    if [ -z "$layout_path" ]; then
+        set_layout_path
+    fi
+
+    if [ ! -d "${layout_path}" ]; then
+        die "The directory \"${layout_path}\" does not exist"
+    fi
+
+    run_hook "pre-layout-load"
+
+    for layout in $layout_path/*; do
+        workspace=$(basename $layout | sed 's/\(.*\)\..*/\1/')
+
+        if [ -n "$workspace" ]; then
+            run_hook "pre-layout-${workspace}-load"
+
+            i3-msg "workspace ${workspace}; append_layout ${layout}"
+
+            run_hook "post-layout-${workspace}-load"
+        fi
+    done
+
+    run_hook "post-layout-load"
+}
+
+parse_options "$@"
+main

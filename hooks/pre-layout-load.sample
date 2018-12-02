@@ -1,0 +1,5 @@
+#!/bin/sh
+#
+# An example hook script.
+#
+# To enable this hook, rename this file to "pre-layout-load".
