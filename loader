@@ -88,7 +88,7 @@ parse_options() {
 set_layout_path() {
     if [ -n "$1" ] && [ -d "$1" ]; then
         layout_path="$1"
-    elif [ -d "${BASH_SOURCE%/*}" ]; then
+    elif [ -d "${BASH_SOURCE%/*}/layouts" ]; then
         layout_path="${BASH_SOURCE%/*}/layouts"
     elif [ -d ~/.config/i3 ]; then
         layout_path=~/.config/i3/layouts
