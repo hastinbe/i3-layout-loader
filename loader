@@ -58,6 +58,7 @@ Load i3wm workspace layouts.
 
 Options:
   -d <directory>    use the provided layout directory
+  -s <seconds>      time to sleep between loading layouts
   -v                verbose
   -h                display this help and exit
 " 1>&2
@@ -75,10 +76,13 @@ verbose() {
 parse_options() {
     local OPTIND o
 
-    while getopts ":d:vh" o; do
-        case "${o}" in
+    while getopts ":d:s:vh" o; do
+        case "$o" in
             d)
-              set_layout_path "${OPTARG}"
+              set_layout_path "$OPTARG"
+              ;;
+            s)
+              sleep="$OPTARG"
               ;;
             v)
               verbose=true
@@ -155,6 +159,10 @@ main() {
             i3-msg "workspace ${workspace}; append_layout ${layout//\//\\/}"
 
             run_hook "post-layout-${workspace}-load"
+
+            if [ -n "$sleep" ]; then
+              sleep "$sleep"
+            fi
         fi
     done
 
