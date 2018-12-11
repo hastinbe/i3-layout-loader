@@ -58,21 +58,34 @@ Load i3wm workspace layouts.
 
 Options:
   -d <directory>    use the provided layout directory
+  -v                verbose
   -h                display this help and exit
 " 1>&2
     exit 0
+}
+
+# Verbose output, if enabled
+verbose() {
+    if $verbose; then
+        echo "$*"
+    fi
 }
 
 # Parse script options.
 parse_options() {
     local OPTIND o
 
-    while getopts ":d:h" o; do
+    while getopts ":d:vh" o; do
         case "${o}" in
             d)
-                set_layout_path "${OPTARG}" ;;
+              set_layout_path "${OPTARG}"
+              ;;
+            v)
+              verbose=true
+              ;;
             h | *)
-                usage ;;
+              usage
+              ;;
         esac
     done
 
@@ -99,6 +112,7 @@ set_layout_path() {
     else
         die "Could not find a layout path. Try specifying one with the -d flag"
     fi
+    verbose "Using layout path: $layout_path"
 }
 
 # Run a hook.
@@ -106,10 +120,12 @@ set_layout_path() {
 # Arguments:
 #   hook  (string) Name of the hook.
 run_hook() {
-    local name=$1
+    local name="$1"
+    local hook="${HOOK_PATH}/${name}"
 
-    if [ -x "${HOOK_PATH}/${hook}" ]; then
-        source "${HOOK_PATH}/hook"
+    if [ -x "$hook" ]; then
+        verbose "Executing hook: $hook"
+        source "$hook"
     fi
 }
 
@@ -119,19 +135,24 @@ main() {
         set_layout_path
     fi
 
-    if [ ! -d "${layout_path}" ]; then
+    if [ ! -d "$layout_path" ]; then
         die "The directory \"${layout_path}\" does not exist"
     fi
 
     run_hook "pre-layout-load"
 
     for layout in $layout_path/*; do
-        workspace=$(basename $layout | sed 's/\(.*\)\..*/\1/')
+        if [ -d "$layout" ]; then continue; fi
+
+        workspace=$(basename "$layout" | sed 's/\(.*\)\..*/\1/')
 
         if [ -n "$workspace" ]; then
+            verbose "Workspace: $workspace"
+
             run_hook "pre-layout-${workspace}-load"
 
-            i3-msg "workspace ${workspace}; append_layout ${layout}"
+            verbose "Loading layout: $layout"
+            i3-msg "workspace ${workspace}; append_layout ${layout//\//\\/}"
 
             run_hook "post-layout-${workspace}-load"
         fi
@@ -140,5 +161,6 @@ main() {
     run_hook "post-layout-load"
 }
 
+verbose=false
 parse_options "$@"
 main
